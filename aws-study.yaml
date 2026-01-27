@@ -1,14 +1,123 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: AWS-Study Template
 
+Parameters:
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: SelectKeypPir
+
+  DBPassword:
+    Type: String
+    Description: DBPassword
+
 Resources:
   # VPC
-  VPC:
+  MyVPC:
     Type: AWS::EC2::VPC
     Properties:
-      CidrBlock: 10.2.0.0/16
+      CidrBlock: 10.0.0.0/16
       EnableDnsHostnames: true
       EnableDnsSupport: true
       Tags:
         - Key: Name
           Value: aws-study-vpc
+  
+  # IGW
+  MyIGW:
+    Type: AWS::EC2::InternetGateway
+
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref MyVPC
+      InternetGatewayId: !Ref MyIGW
+  
+  # PublicSubNetwork
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref MyVPC
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: !Select [0,!GetAZs '']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: public-subnet-1
+
+  PublicRuteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref MyVPC
+  
+  PublicRute:
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref PublicRuteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref MyIGW
+  
+  PublicRuteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRuteTable
+      SubnetId: !Ref PublicSubnet
+
+  # PrivateSubnet
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref MyVPC
+      CidrBlock: 10.0.2.0/24
+      AvailabilityZone: !Select [0,!GetAZs '']
+      Tags:
+        - Key: Name
+          Value: private-subnet-1
+  
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref MyVPC
+      CidrBlock: 10.0.3.0/24
+      AvailabilityZone: !Select [1,!GetAZs '']
+      Tags:
+        - Key: Name 
+          Value: private-subnet-2
+
+  # SecurityGroup
+  EC2sg:
+   Type: AWS::EC2::SecurityGroup
+   Properties:
+     GroupName: aws-study-sg
+     GroupDescription: SSH(22) HTTP(80) SpringBoot(8080)  
+     VpcId: !Ref MyVPC
+     SecurityGroupIngress:
+       - IpProtocol: tcp
+         FromPort: 80
+         ToPort: 80
+         CidrIp: 0.0.0.0/0
+       - IpProtocol: tcp
+         FromPort: 22
+         ToPort: 22
+         CidrIp: 0.0.0.0/0
+       - IpProtocol: tcp
+         FromPort: 8080
+         ToPort: 8080
+         CidrIp: 0.0.0.0/0
+  
+  DBsg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: aws-study-db-sg
+      GroupDescription: MySQL
+      VpcId: !Ref MyVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref EC2sg
+  
+  
+      
+               
+
