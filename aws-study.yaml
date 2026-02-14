@@ -29,7 +29,7 @@ Resources:
       InternetGatewayId: !Ref MyIGW
 
   # PublicSubNetwork
-  PublicSubnet:
+  PublicSubnet1a:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref MyVPC
@@ -38,28 +38,81 @@ Resources:
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: public-subnet-1
-
-  PublicRuteTable:
+          Value: public-subnet-1a
+  
+  PublicSubnet1c:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref MyVPC
+      CidrBlock: 10.0.2.0/24
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: public-subnet-1c
+    
+  # PrivateSubNetwork
+  PrivateSubnet1a:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref MyVPC
+      CidrBlock: 10.0.3.0/24
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]      
+      Tags:
+        - Key: Name
+          Value: private-subnet-1a
+  
+  PrivateSubnet1c:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref MyVPC
+      CidrBlock: 10.0.4.0/24
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]      
+      Tags:
+        - Key: Name
+          Value: private-subnet-1c
+          
+  PublicRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
       VpcId: !Ref MyVPC
 
-  PublicRute:
+  PublicRoute:
     Type: AWS::EC2::Route
     DependsOn: AttachGateway
     Properties:
-      RouteTableId: !Ref PublicRuteTable
+      RouteTableId: !Ref PublicRouteTable
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId: !Ref MyIGW
 
-  PublicRuteTableAssociation:
+  PublicRouteTableAssociation1a:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref PublicRuteTable
-      SubnetId: !Ref PublicSubnet
-
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet1a
   
+  PublicRouteTableAssociation1c:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet1c
+  
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref MyVPC
+  
+  PrivateRouteTableAssociation1a:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref PrivateSubnet1a
+
+  PrivateRouteTableAssociation1c:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref PrivateSubnet1c
 
   # SecurityGroup
   EC2sg:
@@ -87,7 +140,7 @@ Resources:
     Properties:
       InstanceType: t3.micro
       ImageId: !Ref LatestAmiId
-      SubnetId: !Ref PublicSubnet
+      SubnetId: !Ref PublicSubnet1a
       SecurityGroupIds:
         - !Ref EC2sg
 
