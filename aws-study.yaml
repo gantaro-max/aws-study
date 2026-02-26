@@ -8,6 +8,14 @@ Parameters:
   
   MyKeyPairName:
     Type: AWS::EC2::KeyPair::KeyName
+  
+  DBUser:
+    Type: String
+    Default: admin
+
+  DBPass:
+    Type: String
+    NoEcho: true
 
 Resources:
   # VPC
@@ -122,21 +130,22 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupName: aws-study-sg
-      GroupDescription: SSH(22) HTTP(80) SpringBoot(8080)
+      GroupDescription: SSH(22)
       VpcId: !Ref MyVPC
       SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 80
-          ToPort: 80
-          CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
-          CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: 8080
-          ToPort: 8080
-          CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80          
+        SourceSecurityGroupId: !Ref ALBsg 
+      - IpProtocol: tcp
+        FromPort: 8080
+        ToPort: 8080
+        SourceSecurityGroupId: !Ref ALBsg     
+      
   
   EC2Ins:
     Type: AWS::EC2::Instance
@@ -147,5 +156,85 @@ Resources:
       KeyName: !Ref MyKeyPairName
       SecurityGroupIds:
         - !Ref EC2sg
-
+      Tags:
+        - Key: Name
+          Value: aws-study-ec2
   
+  DBsg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: MySQL
+      GroupName: aws-study-db-sg      
+      VpcId: !Ref MyVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref EC2sg
+  
+  DBSubnetGp:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnet RDS
+      SubnetIds:
+        - !Ref PrivateSubnet1a
+        - !Ref PrivateSubnet1c
+
+  MyDBIns:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      Engine: mysql
+      EngineVersion: "8.0.35"
+      DBInstanceClass: db.t3.micro
+      AllocatedStorage: 20
+      MasterUsername: !Ref DBUser
+      MasterUserPassword: !Ref DBPass
+      DBSubnetGroupName: !Ref DBSubnetGp
+      VPCSecurityGroups:
+        - !Ref DBsg
+  
+  ALBsg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: ALB SG
+      GroupName: aws-study-alb-sg 
+      VpcId: !Ref MyVPC
+      SecurityGroupIngress:        
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+
+  MyELB:        
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Scheme: internet-facing
+      Type: application
+      SecurityGroups:
+        - !Ref ALBsg
+      Subnets:
+        - !Ref PublicSubnet1a
+        - !Ref PublicSubnet1c
+  
+  MyELBtg:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      VpcId: !Ref MyVPC
+      Port: 80
+      Protocol: HTTP
+      TargetType: instance
+      Targets:
+        - Id: !Ref EC2Ins
+          Port: 80
+  
+  MyELBlistener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:        
+      LoadBalancerArn: !Ref MyELB
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref MyELBtg     
